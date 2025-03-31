@@ -60,3 +60,170 @@ ALTER TABLE job_applied
 DROP COLUMN contact_name;
 
 DROP TABLE job_applied;
+
+SELECT *  FROM company_dim
+LIMIT 20
+;
+
+SELECT
+    count(job_id) AS number_of_jobs,
+    CASE
+        WHEN job_location = 'Anywhere' THEN 'Remote'
+        WHEN job_location = 'NY' THEN 'Local'
+        ELSE 'Onsite'
+    END AS location_category
+FROM 
+    job_postings_fact
+GROUP BY
+    location_category    
+;
+
+SELECT *
+FROM ( 
+    SELECT *
+    FROM job_postings_fact
+    WHERE EXTRACT(MONTH from job_posted_date ) = 1
+) as january_jobs;
+
+WITH january_jobs AS (
+    SELECT *
+    FROM job_postings_fact
+    WHERE EXTRACT(MONTH FROM job_posted_date) = 1
+)
+
+SELECT *
+FROM january_jobs;
+
+SELECT
+    name 
+FROM 
+    company_dim
+WHERE 
+    company_id IN (
+        SELECT 
+            company_id
+        FROM
+            job_postings_fact
+        WHERE
+            job_no_degree_mention = TRUE
+);
+
+
+SELECT *
+from company_dim;
+
+WITH 
+    jobs 
+as 
+(
+    SELECT
+        company_id,
+        count(*) as count_job_list
+    FROM
+        job_postings_fact
+    GROUP BY
+        company_id)
+
+SELECT 
+    company_dim.name AS company_name,
+    jobs.count_job_list    
+FROM
+    company_dim
+LEFT JOIN
+    jobs
+ON
+    company_dim.company_id = jobs.company_id
+;
+
+
+WITH skill_count AS (
+    SELECT 
+        skills_job_dim.skill_id as skill_id,
+        count(*) as counts
+    FROM
+        skills_job_dim
+    INNER JOIN
+        job_postings_fact
+    ON
+        skills_job_dim.job_id = job_postings_fact.job_id
+    WHERE
+        job_postings_fact.job_work_from_home = TRUE
+    GROUP BY
+        skills_job_dim.skill_id
+)
+
+SELECT    
+    skill_count.skill_id AS skill_id,
+    skills_dim.skills AS skill_name,
+    skill_count.counts As posting_count
+FROM
+    skill_count 
+INNER JOIN
+    skills_dim
+ON 
+    skill_count.skill_id = skills_dim.skill_id
+ORDER BY
+    posting_count
+    DESC
+LIMIT
+    5;
+
+select *
+from job_postings_fact;
+
+select *
+from
+(SELECT 
+    job_title_short,
+    company_id,
+    job_location,
+    salary_year_avg
+FROM
+    january_jobs
+
+UNION
+SELECT 
+    job_title_short,
+    company_id,
+    job_location,
+    salary_year_avg
+FROM
+    february_jobs
+
+UNION
+SELECT 
+    job_title_short,
+    company_id,
+    job_location,
+    salary_year_avg
+FROM
+    march_jobs)
+
+WHERE 
+    salary_year_avg > 70000    
+    ;
+
+SELECT
+    quarter1_job_postings.job_title_short,
+    quarter1_job_postings.job_location,
+    quarter1_job_postings.job_via,
+    quarter1_job_postings.job_posted_date::DATE,
+    quarter1_job_postings.salary_year_avg
+FROM (
+    SELECT *
+    FROM january_jobs
+    UNION ALL
+    SELECT *
+    FROM february_jobs
+    UNION ALL
+    SELECT *
+    FROM march_jobs
+) AS quarter1_job_postings
+
+WHERE 
+    quarter1_job_postings.salary_year_avg > 70000
+AND
+    quarter1_job_postings.job_title_short = 'Data Analyst'
+ORDER BY
+    quarter1_job_postings.salary_year_avg 
+    
